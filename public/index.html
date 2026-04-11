@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WhatsApp Business Setup</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    #result { margin-top: 20px; line-height: 1.5; }
+    .success { color: green; font-weight: bold; }
+  </style>
+</head>
+
+<body>
+
+<h2>Connect WhatsApp Business</h2>
+
+<button onclick="connectWhatsApp()">
+  Login with Facebook & Create WhatsApp Business
+</button>
+
+<p id="token"></p>
+<p id="result"></p>
+
+<div id="fb-root"></div>
+
+<script>
+window.fbAsyncInit = function() {
+  FB.init({
+    appId: "3903033773163724",
+    cookie: true,
+    xfbml: true,
+    version: "v19.0"
+  });
+};
+
+(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) return;
+  js = d.createElement(s);
+  js.id = id;
+  js.src = "https://connect.facebook.net/en_US/sdk.js";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));
+
+function connectWhatsApp() {
+  FB.login(function(response) {
+    console.log(response);
+    if (response.authResponse) {
+      const accessToken = response.authResponse.accessToken;
+      console.log("Access Token:", accessToken);
+      
+      document.getElementById("token").innerHTML +=
+        "Login successful!<br><br><b>Your Access Token:</b><br><textarea rows='4' cols='50'>" + accessToken + "</textarea><br><br>Fetching WhatsApp info...";
+
+      getBusinesses(accessToken);
+    } else {
+      alert("Login cancelled");
+    }
+  }, {
+    scope: "business_management,whatsapp_business_management,whatsapp_business_messaging"
+  });
+}
+
+async function getBusinesses(accessToken) {
+  try {
+    const res = await fetch(`https://graph.facebook.com/v19.0/me/businesses?access_token=${accessToken}`);
+    const data = await res.json();
+    
+    if (!data.data || data.data.length === 0) {
+      document.getElementById("result").innerHTML = "Error: No businesses found.";
+      return;
+    }
+    
+    const businessId = data.data[0].id;
+    document.getElementById("result").innerHTML = "Business ID: " + businessId;
+
+    getWABA(businessId, accessToken);
+  } catch (err) {
+    console.error(err);
+    document.getElementById("result").innerHTML = "Error fetching businesses.";
+  }
+}
+
+async function getWABA(businessId, accessToken) {
+  try {
+    const res = await fetch(`https://graph.facebook.com/v19.0/${businessId}/owned_whatsapp_business_accounts?access_token=${accessToken}`);
+    const data = await res.json();
+    
+    if (!data.data || data.data.length === 0) {
+      document.getElementById("result").innerHTML += "<br>Error: No WABA found.";
+      return;
+    }
+
+    const wabaId = data.data[0].id;
+    document.getElementById("result").innerHTML += "<br>WABA ID: " + wabaId;
+
+    getPhoneNumbers(wabaId, accessToken);
+  } catch (err) {
+    console.error(err);
+    document.getElementById("result").innerHTML += "<br>Error fetching WABA.";
+  }
+}
+
+async function getPhoneNumbers(wabaId, accessToken) {
+  try {
+    const res = await fetch(`https://graph.facebook.com/v19.0/${wabaId}/phone_numbers?access_token=${accessToken}`);
+    const data = await res.json();
+    
+    if (!data.data || data.data.length === 0) {
+      document.getElementById("result").innerHTML += "<br>Error: No phone numbers found.";
+      return;
+    }
+
+    const phoneId = data.data[0].id;
+    document.getElementById("result").innerHTML += "<br>Phone Number ID: " + phoneId;
+    
+    saveCredentialsToBackend(accessToken, phoneId);
+  } catch (err) {
+    console.error(err);
+    document.getElementById("result").innerHTML += "<br>Error fetching phone numbers.";
+  }
+}
+
+async function saveCredentialsToBackend(accessToken, phoneId) {
+  try {
+    document.getElementById("result").innerHTML += "<br><br>Saving to bot configuration...";
+    const res = await fetch('/api/credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken, phoneId })
+    });
+    
+    if (res.ok) {
+      document.getElementById("result").innerHTML += "<br><br><span class='success'>✅ Configuration saved successfully! Your bot is ready.</span>";
+    } else {
+      document.getElementById("result").innerHTML += "<br><br><span style='color:red'>❌ Failed to save configuration.</span>";
+    }
+  } catch (err) {
+    console.error(err);
+    document.getElementById("result").innerHTML += "<br><br><span style='color:red'>❌ Failed to save configuration.</span>";
+  }
+}
+</script>
+
+</body>
+</html>

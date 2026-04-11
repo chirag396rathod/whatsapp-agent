@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Sensitive data
+data/credentials.json
+
+# Auto-generated RAG index (rebuild with: node vectorless-rag/buildIndex.js)
+data/documents.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
