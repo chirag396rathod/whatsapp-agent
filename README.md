@@ -1,6 +1,6 @@
 # 🌞 SolExpert WhatsApp AI Bot
 
-A production-ready WhatsApp AI assistant for **PRO-SOLEXPERT**, a solar panel cleaning company. The bot uses a custom **Vectorless RAG** (Retrieval-Augmented Generation) system powered by **Groq AI** to answer customer queries intelligently — without any vector database.
+A production-ready WhatsApp AI assistant for **PRO-SOLEXPERT**, a solar panel cleaning company. The bot uses a custom **Vectorless RAG** (Retrieval-Augmented Generation) system powered by **OpenRouter → GPT-4o-mini** to answer customer queries intelligently — without any vector database.
 
 ---
 
@@ -39,7 +39,7 @@ solexpert-bot/
         ├── parseDoc.js          # Reads plain text source file
         ├── structureBuilder.js  # Splits text into logical tree/chunk nodes
         ├── treeEnricher.js      # Enriches nodes with AI-generated summaries
-        ├── summarizer.js        # Calls Groq to summarize each chunk
+        ├── summarizer.js        # Calls OpenRouter to summarize each chunk
         └── retriever.js         # Keyword-based context retriever (no vectors)
 ```
 
@@ -50,19 +50,19 @@ solexpert-bot/
 Instead of expensive vector embeddings and a vector database, this system uses a **tree-based document index**:
 
 ```
-PDF/Text Document
-       ↓
-  parseDoc.js (extract lines)
-       ↓
+Plain Text Content File
+         ↓
+   parseDoc.js (extract lines)
+         ↓
 structureBuilder.js (split into chunks/sections)
-       ↓
-treeEnricher.js + summarizer.js (generate summaries per chunk via Groq)
-       ↓
+         ↓
+treeEnricher.js + summarizer.js (generate summaries per chunk via OpenRouter)
+         ↓
 documents.json (saved index)
-       ↓
+         ↓
 retriever.js (keyword scoring to find top relevant chunks)
-       ↓
-rag.js (pass context + question to Groq → answer)
+         ↓
+rag.js (pass context + question to OpenRouter GPT-4o-mini → answer)
 ```
 
 **Benefits:** No Pinecone, no ChromaDB, no embeddings API costs. Just a JSON file + fast keyword retrieval.
@@ -89,21 +89,19 @@ VERIFY_TOKEN=your_webhook_verify_token
 WHATSAPP_TOKEN=your_whatsapp_access_token
 PHONE_NUMBER_ID=your_phone_number_id
 APP_SECRATE=your_app_secret
-
-# Groq AI
-GROQ_API_KEY=your_groq_api_key
-
-# (Optional) For credential encryption
 APP_PASSWORD=your_admin_password
+
+# OpenRouter API (https://openrouter.ai)
+OPEN_AI_API_KEY=sk-or-v1-your-openrouter-key
 ```
 
-> Get your Groq API key free at [console.groq.com](https://console.groq.com)
+> Get your free OpenRouter API key at [openrouter.ai/keys](https://openrouter.ai/keys)
 
 ### 3. Prepare Your Knowledge Base
 
 Since the source PDF is image-based (scanned), you must provide a plain text version:
 
-1. Copy the content from `data/solexpert bot.pdf` (manually or via OCR)
+1. Copy the content from `data/solexpert bot.pdf` manually
 2. Save it as `data/solexpert-content.txt`
 
 ### 4. Build the RAG Index
@@ -112,7 +110,7 @@ Since the source PDF is image-based (scanned), you must provide a plain text ver
 node vectorless-rag/buildIndex.js
 ```
 
-This reads `data/solexpert-content.txt`, chunks it, generates summaries via Groq, and saves the index to `data/documents.json`.
+This reads `data/solexpert-content.txt`, chunks it, generates summaries via OpenRouter, and saves the index to `data/documents.json`.
 
 > ⚠️ **Re-run this every time you update the content file.**
 
@@ -149,10 +147,10 @@ Visit `http://localhost:3000` in your browser to enter your **WhatsApp Access To
 
 ## 🤖 AI Model
 
-| Component | Model |
-|-----------|-------|
-| RAG Query Engine | `llama-3.3-70b-versatile` (Groq) |
-| Chunk Summarizer | `llama-3.3-70b-versatile` (Groq) |
+| Component | Provider | Model |
+|-----------|----------|-------|
+| RAG Query Engine | OpenRouter | `openai/gpt-4o-mini` |
+| Chunk Summarizer | OpenRouter | `openai/gpt-4o-mini` |
 
 The bot responds:
 - Based **only** on the indexed document content
@@ -183,21 +181,20 @@ To update what the bot knows:
 | Package | Purpose |
 |---------|---------|
 | `express` | HTTP server |
-| `groq-sdk` | Groq AI API client |
+| `openai` | OpenAI-compatible SDK (used with OpenRouter) |
 | `dotenv` | Environment variable loading |
 | `fs-extra` | File utilities |
 | `uuid` | Unique IDs for RAG nodes |
-| `pdf-parse` | (Available, unused — PDF is image-based) |
 
 ---
 
 ## 🔒 Security Notes
 
-- **Never commit `.env`** to version control — add it to `.gitignore`
+- **Never commit `.env`** to version control — it's in `.gitignore`
 - The `data/credentials.json` file contains live API tokens — keep it private
-- Consider adding `.gitignore` entries for sensitive files (see below)
+- `data/documents.json` is auto-generated — no need to commit it
 
-### Recommended `.gitignore`
+### `.gitignore` entries
 
 ```
 .env
@@ -219,9 +216,9 @@ User sends WhatsApp message
          ↓
    retriever.js scores documents.json
          ↓
-   Top 3 matching chunks → Groq API
+   Top 3 matching chunks → OpenRouter API
          ↓
-   AI-generated answer → WhatsApp reply
+   GPT-4o-mini answer → WhatsApp reply
 ```
 
 ---

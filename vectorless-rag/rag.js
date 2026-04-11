@@ -1,9 +1,14 @@
-const Groq = require("groq-sdk");
+const OpenAI = require("openai");
 const fs = require("fs");
 const getTopContext = require("./core/retriever");
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
+const openai = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPEN_AI_API_KEY,
+  defaultHeaders: {
+    "HTTP-Referer": "https://solexpert.in",
+    "X-OpenRouter-Title": "SolExpert WhatsApp Bot"
+  }
 });
 
 // Avoid crashing if documents.json doesn't exist yet by adding a safety check or initializing dynamically if needed.
@@ -24,8 +29,8 @@ async function ask(query) {
     .map(n => `Title: ${n.title}\nSummary: ${n.summary}`)
     .join("\n\n");
 
-  const res = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+  const res = await openai.chat.completions.create({
+    model: "openai/gpt-4o-mini",
     messages: [
       {
         role: "system",
