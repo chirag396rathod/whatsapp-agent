@@ -1,74 +1,62 @@
 const { v4: uuidv4 } = require("uuid");
 
-const CHUNK_SIZE = 300; // words per chunk
-
-function detectHeadingLevel(line) {
-  // All-caps short line (e.g. "SERVICES", "ABOUT US")
-  if (/^[A-Z][A-Z\s\-]{3,50}$/.test(line.trim())) return 1;
-  // Numbered section (e.g. "1. Introduction")
-  if (/^\d+\.\s+\S/.test(line.trim())) return 2;
-  // Sub-numbered section (e.g. "1.1 Details")
-  if (/^\d+\.\d+\s+\S/.test(line.trim())) return 3;
-  // Short title-case line under 60 chars (e.g. "Solar Panel Cleaning Benefits")
-  if (line.trim().length < 60 && /^[A-Z][a-zA-Z\s\-]+$/.test(line.trim()) && line.trim().split(" ").length <= 8) return 2;
-  return 0;
-}
-
-function createNode(title, level) {
-  return {
+function buildTree(lines) {
+  const tree = {
     id: uuidv4(),
-    title,
-    level,
+    title: "ROOT", // Document root
     content: "",
     summary: "",
     keywords: [],
     children: []
   };
-}
 
-function chunkIntoNodes(lines) {
-  // Fallback: split flat text into ~CHUNK_SIZE word chunks
-  const allText = lines.join(" ");
-  const words = allText.split(/\s+/);
-  const root = createNode("ROOT", 0);
-  for (let i = 0; i < words.length; i += CHUNK_SIZE) {
-    const chunk = words.slice(i, i + CHUNK_SIZE).join(" ");
-    const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
-    const node = createNode(`Section ${chunkNum}`, 1);
-    node.content = chunk;
-    root.children.push(node);
-  }
-  return root;
-}
-
-function buildTree(lines) {
-  const root = createNode("ROOT", 0);
-  const stack = [root];
-  let headingCount = 0;
+  let currentH1 = null;
+  let currentH2 = null;
 
   lines.forEach(line => {
-    const level = detectHeadingLevel(line);
-    if (level > 0) headingCount++;
-  });
-
-  // If fewer than 3 headings detected, use chunk-based fallback
-  if (headingCount < 3) {
-    return chunkIntoNodes(lines);
-  }
-
-  lines.forEach(line => {
-    const level = detectHeadingLevel(line);
-    if (level > 0) {
-      const node = createNode(line, level);
-      while (stack.length > level) stack.pop();
-      stack[stack.length - 1].children.push(node);
-      stack.push(node);
-    } else {
-      stack[stack.length - 1].content += " " + line;
+    // Detect headings (better logic for documents)
+    if (line.match(/^[A-Z0-9\s:&\-]+$/) && line.length > 3 && line.length < 50) {
+      // H1
+      currentH1 = { 
+        id: uuidv4(),
+        title: line, 
+        content: "",
+        summary: "",
+        keywords: [],
+        children: [] 
+      };
+      tree.children.push(currentH1);
+      currentH2 = null;
+    } 
+    else if (line.match(/^\d+\.\s/) || line.match(/^PRODUCT \/ SERVICE \d+/) || line.match(/^[A-Z][A-Za-z\s]+:$/)) {
+      // H2 - supports numbered lists, "PRODUCT / SERVICE 1", and "Key Features:"
+      currentH2 = { 
+        id: uuidv4(),
+        title: line, 
+        content: "",
+        summary: "",
+        keywords: [],
+        children: [] 
+      };
+      if (currentH1) {
+        currentH1.children.push(currentH2);
+      } else {
+        tree.children.push(currentH2);
+      }
+    } 
+    else {
+      // Content
+      if (currentH2) {
+        currentH2.content += " " + line;
+      } else if (currentH1) {
+        currentH1.content += " " + line;
+      } else {
+        tree.content += " " + line;
+      }
     }
   });
 
-  return root;
+  return tree;
 }
 
 module.exports = buildTree;

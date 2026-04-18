@@ -1,9 +1,10 @@
-const fs = require('fs');
+const mammoth = require("mammoth");
 
 async function parseDoc(filePath) {
-  const text = fs.readFileSync(filePath, 'utf8');
+  const result = await mammoth.extractRawText({ path: filePath });
+  const text = result.value; // plain text
 
-  // Normalize text
+  // Normalize text to iterate through lines sequentially properly in structureBuilder
   return text
     .replace(/\r/g, "")
     .split("\n")

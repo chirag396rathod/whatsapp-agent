@@ -1,4 +1,3 @@
-require("dotenv").config();
 const OpenAI = require("openai");
 
 const openai = new OpenAI({
@@ -14,7 +13,7 @@ async function summarize(text) {
   if (!text || text.length < 50) return text;
 
   const res = await openai.chat.completions.create({
-    model: "openai/gpt-4o-mini",
+    model: process.env.MODAL_NAME,
     messages: [
       {
         role: "system",

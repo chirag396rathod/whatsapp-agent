@@ -5,7 +5,7 @@ const enrichTree = require("./core/treeEnricher");
 const fs = require("fs-extra");
 
 async function run() {
-  const lines = await parseDoc("data/solexpert-content.txt");
+  const lines = await parseDoc("data/solexpert bot.docx");
 
   const tree = buildTree(lines);
 
