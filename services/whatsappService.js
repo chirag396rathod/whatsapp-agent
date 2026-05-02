@@ -1,11 +1,22 @@
 const axios = require("axios");
 const { getCredentials } = require("../credentialsManager");
+const pool = require("../db");
 
-async function sendMessage(to, message) {
-  const { accessToken, phoneId } = getCredentials();
+async function sendMessage(to, message, credentials) {
+  // Use provided credentials or fall back to system defaults
+  let accessToken, phoneId;
+  
+  if (credentials && credentials.accessToken && credentials.phoneId) {
+    accessToken = credentials.accessToken;
+    phoneId = credentials.phoneId;
+  } else {
+    const systemCreds = getCredentials();
+    accessToken = systemCreds.accessToken;
+    phoneId = systemCreds.phoneId;
+  }
 
   if (!accessToken || !phoneId) {
-    console.warn("Attempted to send a message, but credentials are not set. Please set them via the dynamic auth flow.");
+    console.warn("Attempted to send a message, but credentials are not set.");
     return;
   }
 
@@ -24,6 +35,14 @@ async function sendMessage(to, message) {
         },
       }
     );
+
+    // Log Outgoing Activity if we have a clientId
+    if (credentials && credentials.clientId) {
+      await pool.query(
+        'INSERT INTO activity (client_id, customer_phone, type, message) VALUES ($1, $2, $3, $4)',
+        [credentials.clientId, to, 'outgoing', message]
+      );
+    }
   } catch (err) {
     if (err.response) {
       console.error(

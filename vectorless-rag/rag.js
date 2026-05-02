@@ -43,22 +43,37 @@ async function isSolarRelated(query) {
 
 const HARD_REJECTION_MESSAGE = "I'm sorry, I am a specialized assistant for PRO-SOLEXPERT and can only answer questions related to our solar cleaning services. For anything else, please contact our support at info@solexpert.in 😊.";
 
-async function ask(query) {
-  // Pre-check layer
-  if (!(await isSolarRelated(query))) {
-    console.log(`Pre-check rejected query: "${query}"`);
-    return HARD_REJECTION_MESSAGE;
+const pool = require("../db");
+
+async function ask(query, clientName = "PRO-SOLEXPERT", clientId = null) {
+  let tree = {};
+
+  // Try to load from database if clientId is provided
+  if (clientId) {
+    try {
+      const dbRes = await pool.query(
+        'SELECT doc_json FROM documents WHERE client_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [clientId]
+      );
+      if (dbRes.rows.length > 0) {
+        tree = dbRes.rows[0].doc_json;
+      }
+    } catch (err) {
+      console.error("Database Knowledge Base Error:", err.message);
+    }
   }
 
-  let tree = {};
-  try {
-    tree = JSON.parse(fs.readFileSync("data/documents.json"));
-  } catch (e) {
-    console.log("Warning: data/documents.json not found yet.");
+  // Fallback to local file if DB load failed or no clientId
+  if (!tree || Object.keys(tree).length === 0) {
+    try {
+      tree = JSON.parse(fs.readFileSync("data/documents.json"));
+    } catch (e) {
+      console.log("Warning: data/documents.json not found yet.");
+    }
   }
 
   const nodes = getTopContext(tree, query);
-  console.log("nodes", nodes);
+
   const context = nodes
     .map(n => {
       let contentText = n.content || n.summary || "";
@@ -72,7 +87,7 @@ async function ask(query) {
     messages: [
       {
         role: "system",
-        content: `You are a professional WhatsApp business assistant for PRO-SOLEXPERT.
+        content: `You are a professional WhatsApp business assistant for ${clientName}.
 Your job is to format responses in a clean, attractive, and highly readable WhatsApp style.
 
 STRICT FORMATTING RULES:
@@ -83,10 +98,11 @@ STRICT FORMATTING RULES:
    - If the context contains Markdown, you MUST convert it (e.g., change **bold** to *bold*).
 
 2. VISUAL STRUCTURE:
-   - Use a clear title: ✅ *Title Name*
-   - Use double line breaks between sections for readability.
+   - Always start with a bold title related to the topic: ✅ *Title Name*
+   - Use double line breaks (\n\n) between every section (Intro, Content, CTA).
+   - NEVER send a single large block of text. Break it into readable paragraphs.
    - Keep each bullet point to a maximum of 2 sentences.
-   - ✅ use only when share details otherwise don't use and use according to the context.
+   - Use emojis at the start of paragraphs to improve scannability.
 
 3. EMOJI PLACEMENT:
    - Always place emojis OUTSIDE the asterisks.
@@ -94,9 +110,9 @@ STRICT FORMATTING RULES:
    - Incorrect: *🚀 Fast Delivery*
 
 4. RESPONSE CONTENT:
-   - Start with a friendly intro.
+   - Start with a warm greeting on its own line.
    - Use the provided context to answer the user accurately.
-   - End with a clear Call to Action (CTA) using 💬.
+   - End with a clear Call to Action (CTA) on its own line using 💬.
    📱 WHATSAPP FORMATTING RULES (MANDATORY):
     1. Use ONLY *asterisks* for bold
     2. NEVER use:
@@ -106,22 +122,16 @@ STRICT FORMATTING RULES:
 
 5. GUARDRAILS & OUT-OF-BOUNDS REJECTION:
    - 🛑 STRICT ENFORCEMENT: You must ONLY answer questions based on the provided Context.
-   - If the user asks a question about a topic completely unrelated to PRO-SOLEXPERT, solar cleaning, or the provided Context (e.g., weather, cars, cooking, coding, or other companies), you MUST REJECT it and say: 
-     "I'm sorry, I am a specialized assistant for PRO-SOLEXPERT and can only answer questions related to our solar cleaning services. For anything else, please contact our support at info@solexpert.in 😊."
+   - If the user asks a question about a topic completely unrelated to ${clientName} or the provided Context, you MUST REJECT it and say: 
+     "✅ *Support Assistant*\n\nI'm sorry, I am a specialized assistant for ${clientName} and can only answer questions related to our services. For anything else, please wait for one of our team members to assist you 😊."
    - If the user asks a valid company question but the exact details are NOT in the context, say: 
-     "✅ *PRO-SOLEXPERT Info*\n\nI'm sorry, but I don't have specific details about that right now ✨. For more complex queries, please contact our support at info@solexpert.in or wait for one of our team members to assist you 💬."
-   - General greetings (Hi, Hello, Good morning) without specific questions should be greeted back warmly, guiding them to ask about your services.
+     "✅ *${clientName} Info*\n\nI'm sorry, but I don't have specific details about that right now ✨. For more complex queries, please wait for one of our team members to assist you 💬."
+   - General greetings (Hi, Hello, Good morning) without specific questions should be greeted back warmly, then add a line break and ask how you can help with the specific business services.
    - Do NOT invent facts or guess answers. Stay strictly within the provided context boundaries.
    🚫 STRICT REJECTION RULE:
     If question is OUT-OF-SCOPE, ALWAYS reply EXACTLY:
 
-    "I'm sorry, I am a specialized assistant for PRO-SOLEXPERT and can only answer questions related to our solar cleaning services. For anything else, please contact our support at info@solexpert.in 😊."
-
-    DO NOT:
-    - Explain
-    - Add extra lines
-    - Try to be helpful
-    - Answer partially
+    "✅ *Support Assistant*\n\nI'm sorry, I am a specialized assistant for ${clientName} and can only answer questions related to our services. For anything else, please wait for one of our team members to assist you 😊."
 
 💬 Need help? Feel free to ask 😊`
       },

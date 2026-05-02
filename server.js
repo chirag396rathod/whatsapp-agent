@@ -3,12 +3,19 @@ const path = require("path");
 const webhook = require("./routes/webhook");
 const { setCredentials } = require("./credentialsManager");
 
+const cors = require("cors");
+const auth = require("./routes/auth");
+const data = require("./routes/data");
+
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/webhook", webhook);
+app.use("/api/auth", auth);
+app.use("/api/data", data);
 
 app.post("/api/credentials", (req, res) => {
   const { accessToken, phoneId } = req.body;
