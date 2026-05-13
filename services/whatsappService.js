@@ -2,10 +2,31 @@ const axios = require("axios");
 const { getCredentials } = require("../credentialsManager");
 const pool = require("../db");
 
+try {
+  const axios = require("axios");
+  console.log("axios OK");
+} catch (e) {
+  console.error("axios FAIL", e);
+}
+
+try {
+  const { getCredentials } = require("../credentialsManager");
+  console.log("credentialsManager OK");
+} catch (e) {
+  console.error("credentialsManager FAIL", e);
+}
+
+try {
+  const pool = require("../db");
+  console.log("db OK");
+} catch (e) {
+  console.error("db FAIL", e);
+}
+
 async function sendMessage(to, message, credentials, usage = null) {
   // Use provided credentials or fall back to system defaults
   let accessToken, phoneId;
-  
+
   if (credentials && credentials.accessToken && credentials.phoneId) {
     accessToken = credentials.accessToken;
     phoneId = credentials.phoneId;
@@ -49,13 +70,13 @@ async function sendMessage(to, message, credentials, usage = null) {
       await pool.query(
         'INSERT INTO activity (client_id, customer_phone, type, message, model, input_tokens, output_tokens, cost) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
         [
-          credentials.clientId, 
-          to, 
-          'outgoing', 
-          message, 
-          usage?.model || null, 
-          usage?.input_tokens || null, 
-          usage?.output_tokens || null, 
+          credentials.clientId,
+          to,
+          'outgoing',
+          message,
+          usage?.model || null,
+          usage?.input_tokens || null,
+          usage?.output_tokens || null,
           billedCost
         ]
       );
