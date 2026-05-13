@@ -2,16 +2,38 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const authMiddleware = require('../authMiddleware');
+const sendMessage = require('../services/whatsappService');
+const { getChatSummary } = require('../services/conclusionService');
 
 // @route   GET api/data/customers
 // @desc    Get all customers for the logged in client
 router.get('/customers', authMiddleware, async (req, res) => {
     try {
         const customers = await pool.query(
-            'SELECT * FROM customers WHERE client_id = $1 ORDER BY created_at DESC',
+            'SELECT *, conclusion FROM customers WHERE client_id = $1 ORDER BY created_at DESC',
             [req.client.client_id]
         );
         res.json(customers.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// @route   GET api/data/customers/:phone
+// @desc    Get a single customer by phone number
+router.get('/customers/:phone', authMiddleware, async (req, res) => {
+    try {
+        const customer = await pool.query(
+            'SELECT *, conclusion FROM customers WHERE client_id = $1 AND phone_number = $2',
+            [req.client.client_id, req.params.phone]
+        );
+        
+        if (customer.rows.length === 0) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+        
+        res.json(customer.rows[0]);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
@@ -159,6 +181,100 @@ router.delete('/documents/:id', authMiddleware, async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
+    }
+});
+
+// @route   POST api/data/send-message
+// @desc    Send a WhatsApp message to a customer
+router.post('/send-message', authMiddleware, async (req, res) => {
+    const { phone, message } = req.body;
+    
+    if (!phone || !message) {
+        return res.status(400).json({ error: 'Phone and message are required' });
+    }
+
+    try {
+        // Get client credentials
+        const clientRes = await pool.query(
+            'SELECT auth_token, pin_id, client_id FROM clients WHERE client_id = $1',
+            [req.client.client_id]
+        );
+
+        if (clientRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Client credentials not found' });
+        }
+
+        const client = clientRes.rows[0];
+        const credentials = {
+            accessToken: client.auth_token,
+            phoneId: client.pin_id,
+            clientId: client.client_id
+        };
+
+        // Send message via WhatsApp service
+        await sendMessage(phone, message, credentials);
+
+        res.json({ success: true, message: 'Message sent successfully' });
+    } catch (err) {
+        console.error('Send Message Error:', err.message);
+        res.status(500).json({ error: 'Failed to send message: ' + err.message });
+    }
+});
+
+// @route   POST api/data/conclusion
+// @desc    Get AI conclusion of the last 24h chat
+router.post('/conclusion', authMiddleware, async (req, res) => {
+    const { phone } = req.body;
+    
+    if (!phone) {
+        return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    try {
+        // Fetch activity logs for the last 24 hours for this customer
+        const activityRes = await pool.query(
+            `SELECT * FROM activity 
+             WHERE client_id = $1 
+             AND customer_phone = $2 
+             AND created_at > NOW() - INTERVAL '24 hours'
+             ORDER BY created_at ASC`,
+            [req.client.client_id, phone]
+        );
+
+        const summary = await getChatSummary(activityRes.rows, req.client.client_id);
+
+        // Save conclusion to database
+        const updateRes = await pool.query(
+            'UPDATE customers SET conclusion = $1 WHERE client_id = $2 AND phone_number = $3',
+            [JSON.stringify(summary), req.client.client_id, phone]
+        );
+        
+        console.log(`Conclusion generated and saved for ${phone}. Rows affected: ${updateRes.rowCount}`);
+
+        res.json(summary);
+    } catch (err) {
+        console.error('Conclusion Error:', err.message);
+        res.status(500).json({ error: 'Failed to generate conclusion' });
+    }
+});
+
+// @route   POST api/data/subscribe
+// @desc    Subscribe to Pro plan and add balance
+router.post('/subscribe', authMiddleware, async (req, res) => {
+    try {
+        const result = await pool.query(
+            'UPDATE clients SET plan_id = 1, recharge = recharge + 2000 WHERE client_id = $1 RETURNING recharge, plan_id',
+            [req.client.client_id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Client not found' });
+        }
+        
+        res.json({ success: true, message: 'Subscribed to Pro Plan! ₹2000 added to wallet.', client: result.rows[0] });
+    } catch (err) {
+        console.error('Subscribe Error:', err.message);
+        res.status(500).json({ error: 'Failed to subscribe' });
     }
 });
 

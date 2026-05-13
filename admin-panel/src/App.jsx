@@ -10,6 +10,7 @@ import DocumentEditor from './components/DocumentEditor';
 import ActivityList from './components/ActivityList';
 import Profile from './components/Profile';
 import Settings from './components/Settings';
+import Plans from './components/Plans';
 import { Toaster } from 'react-hot-toast';
 import './index.css';
 
@@ -30,6 +31,7 @@ function App() {
           <Route path="/activity" element={<ActivityList />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/plans" element={<Plans />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

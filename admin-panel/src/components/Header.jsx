@@ -12,35 +12,45 @@ const Header = ({ client }) => {
 
     return (
         <header className="top-header">
-            <div className="header-info" style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <div className="header-info" style={{ width: '100%', justifyContent: 'flex-end', display: 'flex', alignItems: 'center' }}>
                 <div style={{ marginRight: 'auto', fontWeight: '700', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '1.2rem' }}>👋</span>
                     Hi, {client?.client_name || 'Business'}
                 </div>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '1.5rem' }}>
-                        <div className="avatar-circle">
-                            {client?.client_name?.substring(0, 2).toUpperCase() || 'SX'}
-                        </div>
-                        <button 
-                            onClick={handleLogout} 
-                            style={{ 
-                                background: 'transparent', 
-                                border: '1px solid #e63946', 
-                                color: '#e63946', 
-                                padding: '0.4rem 0.8rem', 
-                                borderRadius: '6px', 
-                                fontSize: '0.8rem', 
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                            onMouseOver={(e) => { e.target.style.background = '#e63946'; e.target.style.color = 'white'; }}
-                            onMouseOut={(e) => { e.target.style.background = 'transparent'; e.target.style.color = '#e63946'; }}
-                        >
-                            Logout
-                        </button>
+                    <button 
+                        onClick={() => navigate('/plans')}
+                        className="animate-upgrade-btn"
+                        style={{
+                            background: 'white',
+                            color: 'var(--primary)',
+                            border: '1px solid var(--primary)',
+                            padding: '0.4rem 1.2rem',
+                            borderRadius: '20px',
+                            fontWeight: '800',
+                            fontSize: '0.85rem',
+                            fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif",
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s',
+                            letterSpacing: '0.8px'
+                        }}
+                        onMouseOver={(e) => {
+                            e.currentTarget.style.background = 'var(--primary)';
+                            e.currentTarget.style.color = 'white';
+                        }}
+                        onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'white';
+                            e.currentTarget.style.color = 'var(--primary)';
+                        }}
+                    >
+                        UPGRADE PLAN
+                    </button>
+                    <div className="avatar-circle">
+                        {client?.client_name?.substring(0, 2).toUpperCase() || 'SX'}
                     </div>
                 </div>
             </div>

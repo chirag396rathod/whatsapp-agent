@@ -45,7 +45,13 @@ const HARD_REJECTION_MESSAGE = "I'm sorry, I am a specialized assistant for PRO-
 
 const pool = require("../db");
 
-async function ask(query, clientName = "PRO-SOLEXPERT", clientId = null) {
+/**
+ * @param {string} query - Current user message
+ * @param {string} clientName - Business name for persona
+ * @param {string|null} clientId - Client DB ID for loading their knowledge base
+ * @param {Array<{role:string,content:string}>} conversationHistory - Prior turns from sessionService
+ */
+async function ask(query, clientName = "PRO-SOLEXPERT", clientId = null, conversationHistory = []) {
   let tree = {};
 
   // Try to load from database if clientId is provided
@@ -82,12 +88,10 @@ async function ask(query, clientName = "PRO-SOLEXPERT", clientId = null) {
     })
     .join("\n\n");
 
-  const res = await aiClient.chat.completions.create({
-    model: activeModel,
-    messages: [
-      {
-        role: "system",
-        content: `You are a professional WhatsApp business assistant for ${clientName}.
+  // Build message array: system prompt → prior conversation turns → current question
+  const systemPrompt = {
+    role: "system",
+    content: `You are a professional WhatsApp business assistant for ${clientName}.
 Your job is to format responses in a clean, attractive, and highly readable WhatsApp style.
 
 STRICT FORMATTING RULES:
@@ -111,7 +115,8 @@ STRICT FORMATTING RULES:
 
 4. RESPONSE CONTENT:
    - Start with a warm greeting on its own line.
-   - Use the provided context to answer the user accurately.
+   - Use the provided context AND the prior conversation history to answer the user accurately.
+   - If the user says things like "tell me more", "explain further", "explore more", or "go on", ALWAYS refer back to the previous messages in the conversation to continue from where you left off.
    - End with a clear Call to Action (CTA) on its own line using 💬.
    📱 WHATSAPP FORMATTING RULES (MANDATORY):
     1. Use ONLY *asterisks* for bold
@@ -121,7 +126,7 @@ STRICT FORMATTING RULES:
     3. Convert any markdown to WhatsApp format
 
 5. GUARDRAILS & OUT-OF-BOUNDS REJECTION:
-   - 🛑 STRICT ENFORCEMENT: You must ONLY answer questions based on the provided Context.
+   - 🛑 STRICT ENFORCEMENT: You must ONLY answer questions based on the provided Context and the conversation history.
    - If the user asks a question about a topic completely unrelated to ${clientName} or the provided Context, you MUST REJECT it and say: 
      "✅ *Support Assistant*\n\nI'm sorry, I am a specialized assistant for ${clientName} and can only answer questions related to our services. For anything else, please wait for one of our team members to assist you 😊."
    - If the user asks a valid company question but the exact details are NOT in the context, say: 
@@ -134,18 +139,36 @@ STRICT FORMATTING RULES:
     "✅ *Support Assistant*\n\nI'm sorry, I am a specialized assistant for ${clientName} and can only answer questions related to our services. For anything else, please wait for one of our team members to assist you 😊."
 
 💬 Need help? Feel free to ask 😊`
-      },
-      {
-        role: "user",
-        content: `Context:\n${context}\n\nQuestion: ${query}`
-      }
-    ]
+  };
 
+  // Current user message with injected context
+  const currentUserMessage = {
+    role: "user",
+    content: `Context:\n${context}\n\nQuestion: ${query}`
+  };
+
+  // Merge: [system, ...priorHistory, currentUserMsg]
+  // Prior history uses raw content (no context prefix) as it was already answered
+  const messages = [systemPrompt, ...conversationHistory, currentUserMessage];
+
+  const res = await aiClient.chat.completions.create({
+    model: activeModel,
+    messages
   });
 
   let aiResponse = res.choices[0].message.content;
+  let usage = res.usage;
 
-  return aiResponse;
+  return {
+    text: aiResponse,
+    usage: {
+      model: res.model,
+      input_tokens: usage?.prompt_tokens || 0,
+      output_tokens: usage?.completion_tokens || 0,
+      total_tokens: usage?.total_tokens || 0,
+      cost: usage?.cost || 0
+    }
+  };
 }
 
 module.exports = ask;
